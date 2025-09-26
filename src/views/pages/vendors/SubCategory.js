@@ -8,6 +8,7 @@ import { cilTrash } from '@coreui/icons'
 const SubCategory = () => {
   const [categories, setCategories] = useState([])
   const [subcategories, setSubCategories] = useState([])
+  const [subSubCategories, setSubSubCategories] = useState([])
   const [filteredSubCategories, setFilteredSubCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSubCategory, setSelectedSubCategory] = useState('')
@@ -39,19 +40,36 @@ const SubCategory = () => {
   // Fetch subcategories
   const getSubCategories = async () => {
     try {
-      const response = await axios.get(`${import.meta.env.VITE_BASE_URL}admin/allSubSubCatergory`, {
+      const response = await axios.get(`${import.meta.env.VITE_BASE_URL}admin/fetchAllSubCatergory`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
-      setSubCategories(response.data.subSubCatergories)
+      // Using the correct property name from your data
+      setSubCategories(response.data.subCatergories || response.data.subSubCatergories || [])
+      setFilteredSubCategories(response.data.subCatergories || response.data.subSubCatergories || [])
     } catch (error) {
       console.error('Error fetching subcategories:', error)
     }
   }
 
+  // Fetch sub-sub categories
+  const getSubSubCategories = async () => {
+    try {
+      const response = await axios.get(`${import.meta.env.VITE_BASE_URL}admin/allSubSubCatergory`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      setSubSubCategories(response.data.subSubCatergories || [])
+    } catch (error) {
+      console.error('Error fetching sub-sub categories:', error)
+    }
+  }
+
   useEffect(() => {
     getSubCategories()
+    getSubSubCategories()
   }, [token])
 
   // Handle category change and filter subcategories
@@ -60,16 +78,19 @@ const SubCategory = () => {
     setSelectedCategory(selectedCategory)
 
     // Filter subcategories based on the selected category
-    const filtered = subcategories.filter(
-      (subcategory) => subcategory.catergoryType === selectedCategory,
-    )
-    let uniqueSubCategories = filtered.filter(
-      (obj, index, self) =>
-        index === self.findIndex((t) => t.subCatergoryType.trim() === obj.subCatergoryType.trim()),
-    )
-    console.log(uniqueSubCategories, 'uni')
-
-    setFilteredSubCategories(uniqueSubCategories)
+    if (selectedCategory === '') {
+      setFilteredSubCategories(subcategories)
+    } else {
+      const filtered = subcategories.filter(
+        (subcategory) => subcategory.catergoryType === selectedCategory,
+      )
+      // Remove duplicates based on subCatergoryType
+      const uniqueSubCategories = filtered.filter(
+        (obj, index, self) =>
+          index === self.findIndex((t) => t.subCatergoryType === obj.subCatergoryType),
+      )
+      setFilteredSubCategories(uniqueSubCategories)
+    }
   }
 
   const handleSubCategoryChange = (e) => {
@@ -111,6 +132,7 @@ const SubCategory = () => {
         setItem('')
         setFile(null)
         getSubCategories() // Refresh subcategories after adding new item
+        getSubSubCategories() // Refresh sub-sub categories after adding new item
       } else {
         alert(response.data.message)
       }
@@ -133,6 +155,7 @@ const SubCategory = () => {
     if (res.status === 200) {
       alert('Deleted')
       getSubCategories() // Reload items after deletion
+      getSubSubCategories() // Reload sub-sub categories after deletion
     } else {
       alert(`Error: ${res.data.message}`)
     }
@@ -159,11 +182,9 @@ const SubCategory = () => {
                       value={selectedCategory}
                       onChange={handleCategoryChange}
                     >
-                      <option value="" disabled>
-                        Select a category
-                      </option>
+                      <option value="">All Categories</option>
                       {categories.map((category) => (
-                        <option key={category.id} value={category.catergorytype}>
+                        <option key={category._id} value={category.catergorytype}>
                           {category.catergorytype}
                         </option>
                       ))}
@@ -178,12 +199,11 @@ const SubCategory = () => {
                       className="form-control"
                       value={selectedSubCategory}
                       onChange={handleSubCategoryChange}
+                      disabled={!selectedCategory} // Disable until a category is selected
                     >
-                      <option value="" disabled>
-                        Select a sub category
-                      </option>
+                      <option value="">Select a sub category</option>
                       {filteredSubCategories.map((subcategory) => (
-                        <option key={subcategory.id} value={subcategory.subCatergoryType}>
+                        <option key={subcategory._id} value={subcategory.subCatergoryType}>
                           {subcategory.subCatergoryType}
                         </option>
                       ))}
@@ -212,9 +232,15 @@ const SubCategory = () => {
                       className="form-control"
                       value={item}
                       onChange={(e) => setItem(e.target.value)}
+                      disabled={!selectedSubCategory} // Disable until a subcategory is selected
                     />
                   </div>
-                  <button type="submit" onClick={handleAddItem} className="btn btn-primary">
+                  <button 
+                    type="submit" 
+                    onClick={handleAddItem} 
+                    className="btn btn-primary"
+                    disabled={!selectedSubCategory || !item || !file} // Disable until required fields are filled
+                  >
                     ADD
                   </button>
                 </CForm>
@@ -223,9 +249,9 @@ const SubCategory = () => {
             <div className="mb-4">
               <h4 className="mb-4 mt-4">ALL ITEMS</h4>
               <div className="row gap-4 mx-2">
-                {subcategories.map((item, index) => (
+                {subSubCategories.map((item) => (
                   <div
-                    key={index}
+                    key={item._id}
                     className="card mb-2 col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2"
                     style={{ width: 'auto' }}
                   >
